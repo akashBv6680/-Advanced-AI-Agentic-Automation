@@ -82,16 +82,7 @@ if review_result:
 | **Summary** | {review_result.get('summary', 'N/A')} |
 | **Security Risks** | <ul>{''.join([f'<li>{item}</li>' for item in review_result.get('security_risks', ['None found.'])])}</ul> |
 | **Suggestions** | <ul>{''.join([f'<li>{item}</li>' for item in review_result.get('suggestions', ['No specific suggestions.'])])}</ul> |
-# In pr_agent.py (or any other file in this repo)
-
-# Change this:
-# g = Github(GITHUB_TOKEN)
-# To this (adding a comment):
-# Initialize GitHub API for interaction
-g = Github(GITHUB_TOKEN)
-
-
-
+# In pr_agent.py (or any other file in this repo
 ---
 *Review powered by {OLLAMA_MODEL}*"""
 
@@ -100,3 +91,12 @@ g = Github(GITHUB_TOKEN)
     print("SUCCESS: AI review comment posted to PR.")
 else:
     print("FAILURE: AI agent failed to generate and post a review.")
+
+
+
+# Change this:
+# g = Github(GITHUB_TOKEN)
+# To this (adding a comment):
+# Initialize GitHub API for interaction
+
+

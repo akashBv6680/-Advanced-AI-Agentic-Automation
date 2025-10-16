@@ -83,6 +83,9 @@ if review_result:
 | **Security Risks** | <ul>{''.join([f'<li>{item}</li>' for item in review_result.get('security_risks', ['None found.'])])}</ul> |
 | **Suggestions** | <ul>{''.join([f'<li>{item}</li>' for item in review_result.get('suggestions', ['No specific suggestions.'])])}</ul> |
 
+
+
+
 ---
 *Review powered by {OLLAMA_MODEL}*"""
 

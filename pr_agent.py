@@ -8,21 +8,43 @@ OLLAMA_URL = os.environ.get("OLLAMA_URL")
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL")
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
 
-# PR Context from GitHub Actions
+# --- 1. Robust PR Number and Object Retrieval ---
+
 repo_name = os.environ.get("GITHUB_REPOSITORY")
-pr_number = os.environ.get("GITHUB_EVENT_PULL_REQUEST_NUMBER") or \
-            json.loads(os.environ.get("GITHUB_EVENT_PATH")).get('pull_request', {}).get('number')
-
-if not pr_number:
-    print("CRITICAL: Could not determine PR number. Exiting.")
-    exit(0)
-
-# Initialize GitHub API
 g = Github(GITHUB_TOKEN)
 repo = g.get_repo(repo_name)
-pr = repo.get_pull(pr_number)
 
-# --- 1. Define LLM Prompt and Structure ---
+# GITHUB_REF is the most reliable way to get the PR number in a pull_request event.
+# It is typically formatted as "refs/pull/PR_NUMBER/merge"
+github_ref = os.environ.get("GITHUB_REF")
+pr_number = None
+
+try:
+    # Attempt to extract the PR number from the GITHUB_REF string
+    # E.g., "refs/pull/42/merge" -> 42
+    if github_ref and github_ref.startswith("refs/pull/"):
+        pr_number = int(github_ref.split('/')[2])
+except (IndexError, ValueError):
+    # If GITHUB_REF parsing fails, try the original GITHUB_EVENT_PATH fallback
+    event_path = os.environ.get("GITHUB_EVENT_PATH")
+    if event_path and os.path.exists(event_path):
+        try:
+            with open(event_path, 'r') as f:
+                event_payload = json.load(f)
+                pr_number = event_payload.get('pull_request', {}).get('number')
+        except Exception as e:
+            print(f"WARNING: Could not parse GITHUB_EVENT_PATH payload: {e}")
+
+if not pr_number:
+    print("CRITICAL: Failed to retrieve PR number from both GITHUB_REF and event payload. Exiting.")
+    exit(1)
+
+# Now, initialize the Pull Request object using the validated number
+pr = repo.get_pull(pr_number)
+print(f"Successfully retrieved PR #{pr_number} for review.")
+
+
+# --- 2. Define LLM Prompt and Structure (Remains the Same) ---
 SYSTEM_PROMPT = """You are an expert Senior Software Engineer AI. Your task is to perform a concise code review of the provided Pull Request (PR) diff.
 Focus on security, maintainability, and best practices. Respond ONLY with a JSON object that strictly adheres to the following structure:
 {
@@ -70,27 +92,27 @@ def run_ollama_agent():
         print(f"CRITICAL LLM ERROR: {e}")
         return None
 
-# --- 2. Execute and Post Results ---
+# --- 3. Execute and Post Results (Remains the Same) ---
 review_result = run_ollama_agent()
 
 if review_result:
     # Format the reply for the PR comment
+    # Ensure all list items are handled even if they are None or malformed
+    security_risks_list = review_result.get('security_risks')
+    if not isinstance(security_risks_list, list) or not security_risks_list:
+        security_risks_list = ['None found.']
+    
+    suggestions_list = review_result.get('suggestions')
+    if not isinstance(suggestions_list, list) or not suggestions_list:
+        suggestions_list = ['No specific suggestions.']
+
     comment_body = f"""## 🤖 AI Code Review Summary
 
 | Field | Details |
 | :--- | :--- |
 | **Summary** | {review_result.get('summary', 'N/A')} |
-| **Security Risks** | <ul>{''.join([f'<li>{item}</li>' for item in review_result.get('security_risks', ['None found.'])])}</ul> |
-| **Suggestions** | <ul>{''.join([f'<li>{item}</li>' for item in review_result.get('suggestions', ['No specific suggestions.'])])}</ul> |
-# In pr_agent.py (or any other file in this repo)
-
-# Change this:
-# g = Github(GITHUB_TOKEN)
-# To this (adding a comment):
-# Initialize GitHub API for interaction
-g = Github(GITHUB_TOKEN)
-
-
+| **Security Risks** | <ul>{''.join([f'<li>{item}</li>' for item in security_risks_list])}</ul> |
+| **Suggestions** | <ul>{''.join([f'<li>{item}</li>' for item in suggestions_list])}</ul> |
 
 ---
 *Review powered by {OLLAMA_MODEL}*"""

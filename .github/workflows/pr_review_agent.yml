@@ -8,6 +8,13 @@ jobs:
   code-review:
     runs-on: ubuntu-latest
     
+    # 🌟 CRITICAL FIX: Add permissions block for the GITHUB_TOKEN
+    # This grants the necessary WRITE access to post comments on the PR.
+    permissions:
+      contents: read     # Required for actions/checkout
+      pull-requests: write # Required to post comments/reviews on PRs
+      issues: write        # Required because PR comments are treated as issue comments
+
     # 1. Define Ollama service container
     services:
       ollama_service:
@@ -38,8 +45,9 @@ jobs:
 
       # 2. Pull the LLM Model
       - name: Pull LLM Model
+        # Wait for Ollama service to start, then pull the model
         run: |
-          sleep 10 # Wait for Ollama service to start
+          sleep 10 
           docker exec ollama_service ollama pull ${{ env.OLLAMA_MODEL }}
 
       # 3. Execute the Review Agent Script
